@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NMR multi-sided dice simulation</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* ── Reset & Base ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f0f4f8;
+            color: #1e293b;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        /* ── Page Header ── */.page-header {
+            text-align: center;
+            margin-bottom: 36px;
+        }.page-header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #4f46e5, #0ea5e9);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
+        }.page-header p {
+            margin-top: 8px;
+            color: #64748b;
+            font-size: 0.95rem;
+        }
+
+        /* ── Main Layout ── */.container {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 24px;
+            width: 100%;
+            max-width: 1100px;
+            align-items: start;
+        }
+
+        /* ── Cards ── */.card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 28px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+        }.card-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #4f46e5;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 22px;
+        }
+
+        /* ── Form Controls ── */.form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 18px;
+        }.form-group label {
+            font-size: 0.85rem;
+            color: #475569;
+            font-weight: 600;
+        }.form-group input {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            color: #1e293b;
+            font-size: 0.95rem;
+            padding: 10px 14px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }.form-group input:focus {
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+            background: #fff;
+        }.form-group input::-webkit-inner-spin-button { opacity: 0.5; }
+
+        /* ── Descriptor Badge ── */.descriptor {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.875rem;
+            color: #475569;
+            margin-bottom: 22px;
+            line-height: 1.6;
+        }.descriptor span {
+            color: #0ea5e9;
+            font-weight: 700;
+        }
+
+        /* ── Button ── */.btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #4f46e5, #0ea5e9);
+            color: #fff;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            letter-spacing: 0.03em;
+            transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
+        }.btn:hover  {
+            opacity: 0.92;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(79, 70, 229, 0.35);
+        }.btn:active { opacity: 1; transform: translateY(0); box-shadow: none; }
+
+        /* ── Results Table ── */.results-wrapper {
+            margin-top: 24px;
+            max-height: 340px;
+            overflow-y: auto;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
+        }.results-wrapper::-webkit-scrollbar       { width: 6px; }.results-wrapper::-webkit-scrollbar-track { background: transparent; }.results-wrapper::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+        thead th {
+            position: sticky;
+            top: 0;
+            background: #f8fafc;
+            color: #4f46e5;
+            font-weight: 700;
+            padding: 10px 14px;
+            text-align: center;
+            border-bottom: 1px solid #e2e8f0;
+            white-space: nowrap;
+        }
+        tbody tr { transition: background 0.15s; }
+        tbody tr:hover { background: #f8fafc; }
+        tbody td {
+            padding: 9px 14px;
+            text-align: center;
+            border-bottom: 1px solid #f1f5f9;
+            color: #64748b;
+        }
+        tbody tr:last-child td { border-bottom: none; }
+
+        tbody tr.has-data td            { color: #334155; }
+        tbody tr.has-data td:first-child { color: #0ea5e9; font-weight: 700; }
+
+        /* ── Chart Card ── */.chart-card {
+            display: flex;
+            flex-direction: column;
+        }.chart-container {
+            position: relative;
+            flex: 1;
+            min-height: 380px;
+        }
+
+        /* ── Empty State ── */.empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            min-height: 380px;
+            color: #94a3b8;
+        }.empty-state svg { opacity: 0.5; }.empty-state p   { font-size: 0.9rem; }
+
+        /* ── Responsive ── */
+        @media (max-width: 720px) {.container { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="page-header">
+        <h1>🎲 NMR Spectroscopy / multi-sided dice rolling simulator</h1>
+        <p>Simulate multi-sided dice rolls and relate to NMR spectroscopy</p>
+    </div>
+
+    <div class="container">
+
+        <!-- ── Left Panel ── -->
+        <div class="card">
+            <p class="card-title">Configuration</p>
+
+            <div class="descriptor">
+                Rolling <span id="desc-n">2</span> dice with faces from
+                <span id="desc-neg">−2</span> to <span id="desc-pos">+2</span>
+            </div>
+
+            <div class="form-group">
+                <label for="n-dice">Number of Dice (n)</label>
+                <input type="number" id="n-dice" value="2" min="1"
+                       oninput="updateDescriptor()">
+            </div>
+
+            <div class="form-group">
+                <label for="i-value">Range Value (I)</label>
+                <input type="number" id="i-value" value="2" step="0.5"
+                       oninput="updateDescriptor()">
+            </div>
+
+            <div class="form-group">
+                <label for="m-simulations">Number of Simulations (m)</label>
+                <input type="number" id="m-simulations" value="5" min="1">
+            </div>
+
+            <button class="btn" onclick="simulateDiceRolls()">▶ Run Simulation</button>
+
+            <div id="simulation-results"></div>
+        </div>
+
+        <!-- ── Right Panel ── -->
+        <div class="card chart-card">
+            <p class="card-title">Distribution Chart</p>
+            <div class="chart-container">
+                <div class="empty-state" id="empty-state">
+                    <svg width="52" height="52" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="3" width="7" height="7" rx="1"/>
+                        <rect x="14" y="3" width="7" height="7" rx="1"/>
+                        <rect x="3" y="14" width="7" height="7" rx="1"/>
+                        <rect x="14" y="14" width="7" height="7" rx="1"/>
+                    </svg>
+                    <p>Run a simulation to see the chart</p>
+                </div>
+                <canvas id="result-chart" style="display:none;"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /* ── Live descriptor update ── */
+        function updateDescriptor() {
+            const n = document.getElementById('n-dice').value || 'n';
+            const I = document.getElementById('i-value').value || 'I';
+            document.getElementById('desc-n').textContent   = n;
+            document.getElementById('desc-neg').textContent = `−${I}`;
+            document.getElementById('desc-pos').textContent = `+${I}`;
+        }
+
+        /* ── Main simulation ── */
+        function simulateDiceRolls() {
+            const n = parseInt(document.getElementById('n-dice').value);
+            const I = parseFloat(document.getElementById('i-value').value);
+            const m = parseInt(document.getElementById('m-simulations').value);
+
+            const minValue = -I;
+            const maxValue =  I;
+
+            /* Roll n dice, return sum */
+            function rollDice() {
+                let sum = 0;
+                for (let i = 0; i < n; i++) {
+                    sum += Math.floor(Math.random() * (maxValue - minValue + 1)) + minValue;
+                }
+                return sum;
+            }
+
+            /* Collect frequencies */
+            const freq = {};
+            for (let i = 0; i < m; i++) {
+                const s = rollDice();
+                freq[s] = (freq[s] || 0) + 1;
+            }
+
+            /* Build possible-sums list */
+            const possibleSums = [];
+            for (let i = -n * I; i <= n * I; i++) possibleSums.push(i);
+
+            /* Build result list with percentages */
+            const resultList = possibleSums.map(sum => {
+                const count      = freq[sum] || 0;
+                const percentage = parseFloat(((count / m) * 100).toFixed(2));
+                return { sum, count, percentage };
+            });
+
+            /* Normalized percentage (relative to min non-zero) */
+            const nonZero = resultList.map(r => r.percentage).filter(p => p > 0);
+            const minPct  = nonZero.length ? Math.min(...nonZero) : 1;
+
+            /* ── Render table ── */
+            let tableHTML = `
+                <div class="results-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Sum</th>
+                                <th>Percentage</th>
+                                <th>Normalized</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+            resultList.forEach(({ sum, percentage }) => {
+                const norm     = percentage > 0 ? (percentage / minPct).toFixed(2) : '—';
+                const rowClass = percentage > 0 ? 'has-data' : '';
+                tableHTML += `
+                    <tr class="${rowClass}">
+                        <td>${sum}</td>
+                        <td>${percentage}%</td>
+                        <td>${norm}</td>
+                    </tr>`;
+            });
+
+            tableHTML += `</tbody></table></div>`;
+            document.getElementById('simulation-results').innerHTML = tableHTML;
+
+            /* ── Render chart ── */
+            document.getElementById('empty-state').style.display = 'none';
+            const canvas = document.getElementById('result-chart');
+            canvas.style.display = 'block';
+
+            if (window.chartInstance) window.chartInstance.destroy();
+
+            const ctx = canvas.getContext('2d');
+
+            /* Gradient fill */
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(79, 70, 229, 0.5)');
+            gradient.addColorStop(1, 'rgba(14, 165, 233, 0.08)');
+
+            window.chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: resultList.map(r => r.sum),
+                    datasets: [{
+                        label: 'Roll %',
+                        data:  resultList.map(r => r.percentage),
+                        backgroundColor: gradient,
+                        borderColor: 'rgba(79, 70, 229, 0.85)',
+                        borderWidth: 1.5,
+                        borderRadius: 5,
+                        borderSkipped: false,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 600, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#ffffff',
+                            borderColor: '#e2e8f0',
+                            borderWidth: 1,
+                            titleColor: '#4f46e5',
+                            bodyColor: '#334155',
+                            padding: 10,
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                            callbacks: {
+                                title: items => `Sum: ${items[0].label}`,
+                                label: item  => ` ${item.raw}% of rolls`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid:  { color: '#f1f5f9' },
+                            ticks: {
+                                color: '#475569',
+                                font: { size: 13, weight: '600' }
+                            },
+                            border: { color: '#e2e8f0' }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid:  { color: '#f1f5f9' },
+                            ticks: {
+                                color: '#475569',
+                                font: { size: 13, weight: '600' },
+                                callback: v => v + '%'
+                            },
+                            border: { color: '#e2e8f0' }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+
+</body>
+</html>
